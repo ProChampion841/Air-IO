@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 .DS_Store
 
+data/*
+AirIMU_Model_Results/*
+AirIO_Model_Results/*
 pretrained*/*
 experiments/*
 wandb/*
