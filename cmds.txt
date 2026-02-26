@@ -1,0 +1,8 @@
+## Inference CMD
+python inference_motion.py --config configs/BlackBird/motion_body_rot.conf
+
+## Evaluation & Visualize Prediction
+python evaluation/evaluate_motion.py --dataconf configs/datasets/BlackBird/blackbird_body.conf --exp experiments/blackbird/motion_body_rot --seqlen 500
+
+## EKF Example
+python EKF/IMUofflinerunner.py --dataconf configs/datasets/BlackBird/blackbird_body.conf --exp experiments/blackbird/motion_body_rot --airimu_exp C:\Users\Admin\Music\Air-IO\experiments\blackbird\motion_body_rot
