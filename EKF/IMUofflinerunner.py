@@ -205,6 +205,7 @@ if __name__ == '__main__':
             io_index = 0
             air_imu_index = 0 
             gt_state = {"pos": [], "vel": [], "rot": []}
+            errors = {"pos": [], "vel": [], "rot": []}
             
             t_range = tqdm.tqdm(dataset_inf)
             for data in t_range:
@@ -233,7 +234,17 @@ if __name__ == '__main__':
                 gt_state["vel"].append(data["gt_vel"][0])
                 gt_state["rot"].append(data["gt_rot"][0])
                 
-                # t_range.set_description(f"io_index: {io_index}, {io_stamp - data['timestamp']}")
+                # Calculate errors
+                pos_error = torch.norm(ekf.state[6:9] - data["gt_pos"][0]).item()
+                vel_error = torch.norm(ekf.state[3:6] - data["gt_vel"][0]).item()
+                pred_rot = pp.so3(ekf.state[:3]).Exp()
+                rot_error = (pred_rot.Inv() @ data["gt_rot"][0]).Log().norm().item() * 180 / np.pi
+                
+                errors["pos"].append(pos_error)
+                errors["vel"].append(vel_error)
+                errors["rot"].append(rot_error)
+                
+                t_range.set_description(f"Pos: {pos_error:.4f}m, Vel: {vel_error:.4f}m/s, Rot: {rot_error:.4f}°")
                 
             gtpos = torch.stack(gt_state["pos"])
             gtrot = torch.stack(gt_state["rot"])
@@ -270,6 +281,55 @@ if __name__ == '__main__':
             pos_dist = (gtpos - ekf_result[:, 6:9]).norm(dim=-1)      
             ekf_vel_dist = (gtvel - ekf_result[:, 3:6]).norm(dim=-1)
             net_vel_dist = (gtvel-interp_net_vel).norm(dim=-1)
+            
+            # Print error statistics
+            print(f"\n{'='*60}")
+            print(f"Error Statistics for {data_name}")
+            print(f"{'='*60}")
+            print(f"Position Error (m):")
+            print(f"  Mean: {np.mean(errors['pos']):.4f}, Std: {np.std(errors['pos']):.4f}")
+            print(f"  Min: {np.min(errors['pos']):.4f}, Max: {np.max(errors['pos']):.4f}")
+            print(f"  Final: {errors['pos'][-1]:.4f}")
+            print(f"\nVelocity Error (m/s):")
+            print(f"  Mean: {np.mean(errors['vel']):.4f}, Std: {np.std(errors['vel']):.4f}")
+            print(f"  Min: {np.min(errors['vel']):.4f}, Max: {np.max(errors['vel']):.4f}")
+            print(f"  Final: {errors['vel'][-1]:.4f}")
+            print(f"\nRotation Error (degrees):")
+            print(f"  Mean: {np.mean(errors['rot']):.4f}, Std: {np.std(errors['rot']):.4f}")
+            print(f"  Min: {np.min(errors['rot']):.4f}, Max: {np.max(errors['rot']):.4f}")
+            print(f"  Final: {errors['rot'][-1]:.4f}")
+            print(f"{'='*60}\n")
+            
+            # Save errors to file
+            error_file = os.path.join(folder, f"{data_name}_errors.txt")
+            with open(error_file, 'w') as f:
+                f.write(f"Error Statistics for {data_name}\n")
+                f.write(f"{'='*60}\n")
+                f.write(f"Position Error (m): Mean={np.mean(errors['pos']):.4f}, Std={np.std(errors['pos']):.4f}, Final={errors['pos'][-1]:.4f}\n")
+                f.write(f"Velocity Error (m/s): Mean={np.mean(errors['vel']):.4f}, Std={np.std(errors['vel']):.4f}, Final={errors['vel'][-1]:.4f}\n")
+                f.write(f"Rotation Error (deg): Mean={np.mean(errors['rot']):.4f}, Std={np.std(errors['rot']):.4f}, Final={errors['rot'][-1]:.4f}\n")
+            
+            # Plot errors over time
+            fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+            axes[0].plot(errors['pos'])
+            axes[0].set_ylabel('Position Error (m)')
+            axes[0].set_title(f'{data_name} - Position Error')
+            axes[0].grid(True)
+            
+            axes[1].plot(errors['vel'])
+            axes[1].set_ylabel('Velocity Error (m/s)')
+            axes[1].set_title('Velocity Error')
+            axes[1].grid(True)
+            
+            axes[2].plot(errors['rot'])
+            axes[2].set_ylabel('Rotation Error (degrees)')
+            axes[2].set_xlabel('Time Step')
+            axes[2].set_title('Rotation Error')
+            axes[2].grid(True)
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(folder, f"{data_name}_errors.png"))
+            plt.close()
 
             plot_bias_subplots(ekf_result[:, 9:12], title="EKF Bias", save_path=os.path.join(folder, f"{data_name}_bias.png"))
             visualize_rotations(f"EKF_rot_{data_name}", gtrot, pp.so3(ekf_result[:, :3]).Exp(), save_folder=folder)
