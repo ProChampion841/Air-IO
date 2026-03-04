@@ -1,8 +1,0 @@
-liecasadi
-numpy
-pyhocon
-pypose
-PyYAML
-scipy
-tqdm
-wandb
