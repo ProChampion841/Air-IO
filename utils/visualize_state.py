@@ -6,7 +6,7 @@ import numpy as np
 import pypose as pp
 import torch
 
-def visualize_motion(save_prefix, save_folder, outstate,infstate,label="AirIO"):
+def visualize_motion(save_prefix, save_folder, outstate,infstate,metrics=None,label="AirIO"):
     ### visualize gt&netoutput velocity, 2d trajectory. 
     gt_x, gt_y, gt_z                = torch.split(outstate["poses_gt"][0].cpu(), 1, dim=1)
     airTraj_x, airTraj_y, airTraj_z = torch.split(infstate["poses"][0].cpu(), 1, dim=1)
@@ -44,7 +44,17 @@ def visualize_motion(save_prefix, save_folder, outstate,infstate,label="AirIO"):
     ax2.legend()
     ax3.legend()
     ax4.legend()
+    
+    # Add metrics text
+    if metrics:
+        text = f"Pos RMSE: {metrics['pos_rmse']:.4f}m  Max: {metrics['pos_max']:.4f}m\n"
+        text += f"Vel RMSE: {metrics['vel_rmse']:.4f}m/s  Max: {metrics['vel_max']:.4f}m/s\n"
+        text += f"Ang RMSE: {metrics['angle_rmse']:.4f}°  Max: {metrics['angle_max']:.4f}°\n"
+        text += f"Flight Distance: {metrics['flight_dist']:.2f}m"
+        fig.text(0.5, 0.02, text, ha='center', fontsize=9, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
     save_prefix += "_state.png"
+    plt.tight_layout(rect=[0, 0.06, 1, 1])
     plt.savefig(os.path.join(save_folder, save_prefix), dpi = 300)
     plt.close()
 

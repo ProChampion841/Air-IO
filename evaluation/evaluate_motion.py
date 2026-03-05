@@ -129,12 +129,38 @@ if __name__ == '__main__':
                 )
                 inf_rte = calculate_rte(inf_outstate, args.seqlen,args.seqlen)
 
+                # Calculate metrics
+                pos_rmse = torch.sqrt((inf_outstate['pos_dist']**2).mean()).item()
+                pos_max = inf_outstate['pos_dist'].max().item()
+                vel_rmse = torch.sqrt((inf_outstate['vel_dist']**2).mean()).item()
+                vel_max = inf_outstate['vel_dist'].max().item()
+                
+                # Calculate angle error from outstate rotations
+                if 'rot' in outstate and 'rot_gt' in outstate:
+                    angle_error = (outstate['rot'].Inv() @ outstate['rot_gt']).Log().norm(dim=-1) * 180 / np.pi
+                    angle_rmse = torch.sqrt((angle_error**2).mean()).item()
+                    angle_max = angle_error.max().item()
+                else:
+                    angle_rmse = angle_max = 0.0
+                
+                # Calculate total flight distance
+                gt_poses = outstate['poses_gt'][0]
+                flight_dist = (gt_poses[1:] - gt_poses[:-1]).norm(dim=-1).sum().item()
+                
+                metrics = {
+                    'pos_rmse': pos_rmse, 'pos_max': pos_max,
+                    'vel_rmse': vel_rmse, 'vel_max': vel_max,
+                    'angle_rmse': angle_rmse, 'angle_max': angle_max,
+                    'flight_dist': flight_dist
+                }
+
                 #save loss result
                 result_dic = {
                     'name': data_name,      
-                    'ATE':torch.sqrt((inf_outstate['pos_dist']**2).mean()).item(),
+                    'ATE':pos_rmse,
                     'AVE':inf_outstate['vel_dist'].mean().item(),
                     'RP_RMSE': np.sqrt((inf_rte**2).mean()).numpy().item(),
+                    **metrics
                     }
                 
                 AllResults.append(result_dic)
@@ -149,7 +175,7 @@ if __name__ == '__main__':
                 print("pos_err: ", inf_outstate['pos_dist'].mean())
                 print("rte",inf_rte.mean())
 
-            visualize_motion(save_prefix, folder,outstate,inf_outstate)
+            visualize_motion(save_prefix, folder,outstate,inf_outstate,metrics)
 
         file_path = os.path.join(folder, "result.json")
         with open(file_path, 'w') as f: 

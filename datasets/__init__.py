@@ -4,3 +4,4 @@ from .dataset_utils import *
 from .EuRoCdataset import *
 from .BlackBirddataset import *
 from .Pegasusdataset import *
+from .KITTIdataset import *

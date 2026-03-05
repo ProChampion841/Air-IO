@@ -28,6 +28,8 @@ core*
 EKFresult/*
 EKF/EKFresult/*
 results/*
+result copy/*
+
 
 #ignore
 data/

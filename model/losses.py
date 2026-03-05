@@ -25,6 +25,7 @@ def get_motion_loss(inte_state, label, confs):
             vel_loss += confs.cov_weight * diag_ln_cov_loss(vel_dist, cov)
         else:
             vel_loss += confs.cov_weight * diag_ln_cov_loss(vel_dist.detach(), cov)
+    
     loss += confs.weight * vel_loss
     return {'loss':loss, 'cov_loss':cov_loss}
 

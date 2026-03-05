@@ -1,8 +1,11 @@
+python train_motion.py --config C:\Users\Admin\Music\Air-IO\configs\KITTI\motion_body_rot.conf
 ## Inference CMD
 python inference_motion.py --config configs/BlackBird/motion_body_rot.conf
+python inference_motion.py --config C:\Users\Admin\Music\Air-IO\configs\KITTI\motion_body_rot.conf
 
 ## Evaluation & Visualize Prediction
-python evaluation/evaluate_motion.py --dataconf configs/datasets/BlackBird/blackbird_body.conf --exp experiments/blackbird/motion_body_rot --seqlen 500
-
+python evaluation/evaluate_motion.py --dataconf configs/datasets/KITTI/kitti_body.conf --exp experiments/kitti/motion_body_rot --seqlen 500
+python evaluation/evaluate_motion.py --dataconf configs/datasets/KITTI/kitti_body.conf --exp experiments/kitti/motion_body_rot
 ## EKF Example
 python EKF/IMUofflinerunner.py --dataconf configs/datasets/BlackBird/blackbird_body.conf --exp experiments/blackbird/motion_body_rot --airimu_exp C:\Users\Admin\Music\Air-IO\experiments\blackbird\motion_body_rot
+python EKF/IMUofflinerunner.py --dataconf configs/datasets/KITTI/kitti_body.conf --exp experiments/kitti/motion_body_rot --airimu_exp C:\Users\Admin\Music\Air-IO\experiments\blackbird\motion_body_rot
