@@ -94,6 +94,18 @@ if __name__ == '__main__':
                 motion_dataset = SeqDataset(data_conf.data_root, data_name, args.device, name = data_conf.name, duration=args.seqlen, step_size=args.seqlen, drop_last=False, conf = dataset_conf)
                 motion_loader = Data.DataLoader(dataset=motion_dataset, batch_size=1, collate_fn=imu_seq_collate, shuffle=False, drop_last=False)
             
+                # Try to find matching key in pickle file
+                if data_name not in inference_state_load:
+                    print(f"[WARN] Key '{data_name}' not found in pickle file.")
+                    print(f"Available keys: {list(inference_state_load.keys())}")
+                    # Try alternative key formats
+                    alt_key = data_name.replace('/', '_')
+                    if alt_key in inference_state_load:
+                        print(f"Using alternative key: {alt_key}")
+                        data_name = alt_key
+                    else:
+                        raise KeyError(f"Cannot find matching key for {data_name}")
+                
                 inference_state = inference_state_load[data_name] 
                 gt_ts =  motion_dataset.data['time']
                 vel_ts = inference_state['ts']
@@ -129,18 +141,37 @@ if __name__ == '__main__':
                 )
                 inf_rte = calculate_rte(inf_outstate, args.seqlen,args.seqlen)
 
-                # Calculate metrics
-                pos_rmse = torch.sqrt((inf_outstate['pos_dist']**2).mean()).item()
-                pos_max = inf_outstate['pos_dist'].max().item()
-                vel_rmse = torch.sqrt((inf_outstate['vel_dist']**2).mean()).item()
-                vel_max = inf_outstate['vel_dist'].max().item()
+                # Calculate position metrics (ATE)
+                pos_error = inf_outstate['pos_dist']
+                ate = torch.sqrt((pos_error**2).mean()).item()  # ATE is RMSE of position error
+                pos_rmse = ate
+                pos_max = pos_error.max().item()
                 
-                # Calculate angle error from outstate rotations
-                if 'rot' in outstate and 'rot_gt' in outstate:
-                    angle_error = (outstate['rot'].Inv() @ outstate['rot_gt']).Log().norm(dim=-1) * 180 / np.pi
+                # Calculate velocity norm metrics
+                vel_pred = inf_outstate['vel'] if 'vel' in inf_outstate else net_vel
+                vel_gt = motion_dataset.data['velocity']
+                vel_norm_error = (vel_pred.norm(dim=-1) - vel_gt.norm(dim=-1)).abs()
+                vel_norm_rmse = torch.sqrt((vel_norm_error**2).mean()).item()
+                vel_norm_max = vel_norm_error.max().item()
+                
+                # Calculate velocity vector metrics
+                vel_error = inf_outstate['vel_dist'] if 'vel_dist' in inf_outstate else (vel_pred - vel_gt).norm(dim=-1)
+                vel_rmse = torch.sqrt((vel_error**2).mean()).item()
+                vel_max = vel_error.max().item()
+                
+                # Calculate angle error metrics
+                # Note: Motion model only predicts velocity, rotation comes from dataset
+                # If using ground truth rotation, angle error will be 0
+                # To get meaningful angle error, use AirIMU or integration rotation in dataset config
+                if 'rot_type' in dataset_conf and dataset_conf.rot_type is not None and dataset_conf.rot_type.lower() != 'none':
+                    # Using predicted rotation (AirIMU or integration)
+                    gt_rot = motion_dataset.data['gt_orientation']
+                    pred_rot = rotation  # rotation from AirIMU or integration
+                    angle_error = (pred_rot.Inv() @ gt_rot).Log().norm(dim=-1) * 180 / np.pi
                     angle_rmse = torch.sqrt((angle_error**2).mean()).item()
                     angle_max = angle_error.max().item()
                 else:
+                    # Using ground truth rotation, no angle error
                     angle_rmse = angle_max = 0.0
                 
                 # Calculate total flight distance
@@ -148,8 +179,10 @@ if __name__ == '__main__':
                 flight_dist = (gt_poses[1:] - gt_poses[:-1]).norm(dim=-1).sum().item()
                 
                 metrics = {
+                    'ATE': ate,
                     'pos_rmse': pos_rmse, 'pos_max': pos_max,
                     'vel_rmse': vel_rmse, 'vel_max': vel_max,
+                    'vel_norm_rmse': vel_norm_rmse, 'vel_norm_max': vel_norm_max,
                     'angle_rmse': angle_rmse, 'angle_max': angle_max,
                     'flight_dist': flight_dist
                 }
@@ -172,10 +205,15 @@ if __name__ == '__main__':
                 
                 print("==============AirIO==============")
                 print("infstate:")
-                print("pos_err: ", inf_outstate['pos_dist'].mean())
-                print("rte",inf_rte.mean())
+                print(f"ATE: {metrics['ATE']:.4f} m")
+                print(f"Position RMSE: {metrics['pos_rmse']:.4f} m, Max: {metrics['pos_max']:.4f} m")
+                print(f"Velocity RMSE: {metrics['vel_rmse']:.4f} m/s, Max: {metrics['vel_max']:.4f} m/s")
+                print(f"Velocity Norm RMSE: {metrics['vel_norm_rmse']:.4f} m/s, Max: {metrics['vel_norm_max']:.4f} m/s")
+                print(f"Angle RMSE: {metrics['angle_rmse']:.4f} deg, Max: {metrics['angle_max']:.4f} deg")
+                print(f"RTE: {inf_rte.mean():.4f} m")
 
-            visualize_motion(save_prefix, folder,outstate,inf_outstate,metrics)
+            visualize_motion(save_prefix, folder,outstate,inf_outstate,metrics)          
+            # visualize_motion(save_prefix, folder,outstate,inf_outstate,metrics)
 
         file_path = os.path.join(folder, "result.json")
         with open(file_path, 'w') as f: 

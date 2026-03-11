@@ -9,3 +9,6 @@ python evaluation/evaluate_motion.py --dataconf configs/datasets/KITTI/kitti_bod
 ## EKF Example
 python EKF/IMUofflinerunner.py --dataconf configs/datasets/BlackBird/blackbird_body.conf --exp experiments/blackbird/motion_body_rot --airimu_exp C:\Users\Admin\Music\Air-IO\experiments\blackbird\motion_body_rot
 python EKF/IMUofflinerunner.py --dataconf configs/datasets/KITTI/kitti_body.conf --exp experiments/kitti/motion_body_rot --airimu_exp C:\Users\Admin\Music\Air-IO\experiments\blackbird\motion_body_rot
+
+
+python realtime_inference.py --model experiments/blackbird/motion_body_rot/ckpt/best_model.ckpt --config configs/BlackBird/motion_body_rot.conf --imu_csv data\Blackbird\eval\ampersand\yawForward\maxSpeed2p0\imu_data.csv
